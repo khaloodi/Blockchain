@@ -129,22 +129,40 @@ node_identifier = str(uuid4()).replace('-', '')
 blockchain = Blockchain()
 
 
-@app.route('/mine', methods=['GET'])
+@app.route('/mine', methods=['POST'])
 def mine():
-    # Run the proof of work algorithm to get the next proof
-    proof = blockchain.proof_of_work(blockchain.last_block)
-    # Forge the new Block by adding it to the chain with the proof
+    # Get data
+    data = request.get_json()
 
-    previous_hash = blockchain.hash(blockchain.last_block)
-    block = blockchain.new_block(proof, previous_hash)
+    # Check that 'proof' and 'id' are present
+    if ('proof' in data) and ('id' in data):
 
-    response = {
-        # TODO: Send a JSON response with the new block
-        'new_block': block
-    }
+        # Get proof and blocksring
+        proof = data['proof']
+        block_string = json.dumps(blockchain.last_block, sort_keys=True)
 
-    return jsonify(response), 200
+        # Make sure proof is valid
+        if blockchain.valid_proof(block_string, proof):
 
+            # Forge the new Block by adding it to the chain with the proof
+            previous_hash = blockchain.hash(blockchain.last_block)
+            block = blockchain.new_block(proof, previous_hash)
+            response = {
+                'new_block': block,
+                'message': 'New Block Forged'
+            }
+
+            return jsonify(response), 200
+
+        else:
+            response = {'message': 'Not Valid Proof'}
+            return jsonify(response), 200
+    
+    else:
+        error_response = {
+            'message': '400: Bad Request'
+            }
+        return jsonify(error_response), 400
 
 @app.route('/chain', methods=['GET'])
 def full_chain():
@@ -155,6 +173,13 @@ def full_chain():
     }
     return jsonify(response), 200
 
+@app.route('/last_block', methods=['GET'])
+def last_block_endpoint():
+    # Get the last block
+    response = {'last_block': blockchain.last_block}
+
+    # Return the last block
+    return jsonify(response), 200
 
 # Run the program on port 5000
 if __name__ == '__main__':
